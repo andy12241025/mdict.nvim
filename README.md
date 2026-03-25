@@ -82,6 +82,12 @@ Inside the floating window:
 4. If still not found, the [Free Dictionary API](https://dictionaryapi.dev) is queried as a last resort
 5. Results are displayed in a centered floating window with formatted output
 
+## Support
+
+If you find this plugin useful, you can buy me a coffee:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/andy622807)
+
 ## License
 
 MIT
