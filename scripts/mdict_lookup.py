@@ -3,12 +3,89 @@
 
 import argparse
 import html
+import json
+import os
 import re
+import sqlite3
 import sys
 
 from mdict_mquery import IndexBuilder
+from mdict_mquery.readmdict import MDX
 
 MAX_REDIRECTS = 5
+
+
+# ---------------------------------------------------------------------------
+# Monkey-patch mdict-mquery to fix an upstream bug where _make_mdx_index
+# references an undefined `version` variable, preventing the META table
+# from being populated.  The patched version uses getattr(mdx, '_version').
+# ---------------------------------------------------------------------------
+
+def _fixed_make_mdx_index(self, db_name):
+    if os.path.exists(db_name):
+        os.remove(db_name)
+    mdx = MDX(self._mdx_file)
+    self._mdx_db = db_name
+    returned_index = mdx.get_index(check_block=self._check)
+    index_list = returned_index["index_dict_list"]
+    conn = sqlite3.connect(db_name)
+    c = conn.cursor()
+    c.execute(
+        """CREATE TABLE MDX_INDEX
+           (key_text text not null,
+            file_pos integer, compressed_size integer,
+            decompressed_size integer, record_block_type integer,
+            record_start integer, record_end integer, offset integer)"""
+    )
+    c.executemany(
+        "INSERT INTO MDX_INDEX VALUES (?,?,?,?,?,?,?,?)",
+        [
+            (
+                item["key_text"], item["file_pos"], item["compressed_size"],
+                item["decompressed_size"], item["record_block_type"],
+                item["record_start"], item["record_end"], item["offset"],
+            )
+            for item in index_list
+        ],
+    )
+    meta = returned_index["meta"]
+    c.execute("CREATE TABLE META (key text, value text)")
+    c.executemany(
+        "INSERT INTO META VALUES (?,?)",
+        [
+            ("encoding", meta["encoding"]),
+            ("stylesheet", meta["stylesheet"]),
+            ("title", meta["title"]),
+            ("description", meta["description"]),
+            ("version", str(getattr(mdx, "_version", ""))),
+        ],
+    )
+    if self._sql_index:
+        c.execute("CREATE INDEX key_index ON MDX_INDEX (key_text)")
+    conn.commit()
+    conn.close()
+    self._encoding = meta["encoding"]
+    self._stylesheet = json.loads(meta["stylesheet"])
+    self._title = meta["title"]
+    self._description = meta["description"]
+
+
+IndexBuilder._make_mdx_index = _fixed_make_mdx_index
+
+
+def _build_index(mdx_path: str) -> IndexBuilder:
+    """Create IndexBuilder, recovering from corrupt/stale .db files."""
+    try:
+        return IndexBuilder(mdx_path)
+    except sqlite3.OperationalError as exc:
+        if "no such table" not in str(exc):
+            raise
+        base = os.path.splitext(mdx_path)[0]
+        for ext in (".mdx.db", ".mdx.cache"):
+            p = base + ext
+            if os.path.exists(p):
+                os.remove(p)
+        return IndexBuilder(mdx_path)
 
 
 def _text(fragment: str) -> str:
@@ -285,7 +362,7 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        ib = IndexBuilder(args.mdx)
+        ib = _build_index(args.mdx)
     except Exception as exc:
         print(f"Error loading dictionary: {exc}", file=sys.stderr)
         sys.exit(1)
