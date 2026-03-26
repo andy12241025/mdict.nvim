@@ -4,6 +4,8 @@ Neovim plugin for looking up words in offline MDict (.mdx) dictionaries. Press a
 
 Falls back to an online dictionary API when offline lookups fail.
 
+![screenshot](screenshot.png)
+
 ## Features
 
 - **Offline lookup** from `.mdx` dictionary files (MDict format)
