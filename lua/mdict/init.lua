@@ -22,6 +22,78 @@ local sections = {}
 -- History stack: each entry is { word = "...", sections = { ... } }
 local history = {}
 
+local ns = vim.api.nvim_create_namespace("mdict")
+
+local function setup_highlights()
+    local set_hl = vim.api.nvim_set_hl
+    set_hl(0, "MdictDictName", { default = true, link = "Title" })
+    set_hl(0, "MdictDivider",  { default = true, link = "NonText" })
+    set_hl(0, "MdictHeadword", { default = true, bold = true, fg = "#e0af68" })
+    set_hl(0, "MdictPos",      { default = true, link = "Type" })
+    set_hl(0, "MdictPron",     { default = true, link = "String" })
+    set_hl(0, "MdictSection",  { default = true, link = "Keyword" })
+    set_hl(0, "MdictDefNum",   { default = true, link = "Number" })
+    set_hl(0, "MdictExample",  { default = true, link = "Comment" })
+    set_hl(0, "MdictBox",      { default = true, link = "WarningMsg" })
+    set_hl(0, "MdictPhrasal",  { default = true, link = "Special" })
+    set_hl(0, "MdictSynonym",  { default = true, link = "Constant" })
+end
+
+local function apply_highlights(buf, lines)
+    vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+    local expect_headword = false
+
+    for i, line in ipairs(lines) do
+        local row = i - 1
+
+        if line:find("^▼") or line:find("^▶") then
+            vim.api.nvim_buf_add_highlight(buf, ns, "MdictDictName", row, 0, -1)
+            expect_headword = true
+
+        elseif line:find("^─") then
+            vim.api.nvim_buf_add_highlight(buf, ns, "MdictDivider", row, 0, -1)
+
+        elseif expect_headword and line ~= "" then
+            expect_headword = false
+            local paren_pos = line:find("  %(")
+            local phon_pos = line:find("  /")
+            if paren_pos then
+                vim.api.nvim_buf_add_highlight(buf, ns, "MdictHeadword", row, 0, paren_pos - 1)
+                vim.api.nvim_buf_add_highlight(buf, ns, "MdictPos", row, paren_pos + 1, -1)
+            elseif phon_pos then
+                vim.api.nvim_buf_add_highlight(buf, ns, "MdictHeadword", row, 0, phon_pos - 1)
+                vim.api.nvim_buf_add_highlight(buf, ns, "MdictPron", row, phon_pos + 1, -1)
+            else
+                vim.api.nvim_buf_add_highlight(buf, ns, "MdictHeadword", row, 0, -1)
+            end
+
+        elseif line:match("^%S") and line:find("/") then
+            vim.api.nvim_buf_add_highlight(buf, ns, "MdictPron", row, 0, -1)
+
+        elseif line:find("━━") then
+            vim.api.nvim_buf_add_highlight(buf, ns, "MdictSection", row, 0, -1)
+
+        elseif line:find("◆") then
+            vim.api.nvim_buf_add_highlight(buf, ns, "MdictExample", row, 0, -1)
+
+        elseif line:find("┌─") then
+            vim.api.nvim_buf_add_highlight(buf, ns, "MdictBox", row, 0, -1)
+
+        elseif line:find("●") then
+            vim.api.nvim_buf_add_highlight(buf, ns, "MdictPhrasal", row, 0, -1)
+
+        elseif line:match("^%s+SYN:") or line:match("^%s+ANT:") then
+            vim.api.nvim_buf_add_highlight(buf, ns, "MdictSynonym", row, 0, -1)
+
+        elseif line:match("^%s+%d+%.%s") then
+            local s, e = line:find("%d+%.")
+            if s then
+                vim.api.nvim_buf_add_highlight(buf, ns, "MdictDefNum", row, s - 1, e)
+            end
+        end
+    end
+end
+
 local function close_float()
     if float_win and vim.api.nvim_win_is_valid(float_win) then
         vim.api.nvim_win_close(float_win, true)
@@ -106,6 +178,7 @@ local function open_float(title)
 
     float_buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(float_buf, 0, -1, false, buf_lines)
+    apply_highlights(float_buf, buf_lines)
     vim.bo[float_buf].modifiable = false
     vim.bo[float_buf].bufhidden = "wipe"
 
@@ -172,6 +245,7 @@ local function open_float(title)
             end
             vim.bo[float_buf].modifiable = true
             vim.api.nvim_buf_set_lines(float_buf, 0, -1, false, new_lines)
+            apply_highlights(float_buf, new_lines)
             vim.bo[float_buf].modifiable = false
 
             local w = 0
@@ -259,6 +333,7 @@ end
 
 function M.setup(opts)
     config = vim.tbl_deep_extend("force", config, opts or {})
+    setup_highlights()
 end
 
 return M
