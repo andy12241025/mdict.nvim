@@ -33,7 +33,8 @@ local function setup_highlights()
     set_hl(0, "MdictPron",     { default = true, link = "String" })
     set_hl(0, "MdictSection",  { default = true, link = "Keyword" })
     set_hl(0, "MdictDefNum",   { default = true, link = "Number" })
-    set_hl(0, "MdictExample",  { default = true, link = "Comment" })
+    set_hl(0, "MdictDef",      { default = true, fg = "#c0caf5" })
+    set_hl(0, "MdictExample",  { default = true, italic = true, fg = "#565f89" })
     set_hl(0, "MdictBox",      { default = true, link = "WarningMsg" })
     set_hl(0, "MdictPhrasal",  { default = true, link = "Special" })
     set_hl(0, "MdictSynonym",  { default = true, link = "Constant" })
@@ -89,6 +90,7 @@ local function apply_highlights(buf, lines)
             local s, e = line:find("%d+%.")
             if s then
                 vim.api.nvim_buf_add_highlight(buf, ns, "MdictDefNum", row, s - 1, e)
+                vim.api.nvim_buf_add_highlight(buf, ns, "MdictDef", row, e, -1)
             end
         end
     end
