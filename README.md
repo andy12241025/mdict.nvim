@@ -29,6 +29,11 @@ Falls back to an online dictionary API when offline lookups fail.
 pip install mdict-mquery
 ```
 
+## Dictionaries
+
+Sample `.mdx` and `.mdd` dictionary files are available in this
+[Google Drive folder](https://drive.google.com/drive/folders/1jXxS5NIIXQxhr3M-XHtuZBmesX-6p3LN?usp=sharing).
+
 ## Installation
 
 ### lazy.nvim
