@@ -34,7 +34,9 @@ local function setup_highlights()
     set_hl(0, "MdictSection",  { default = true, link = "Keyword" })
     set_hl(0, "MdictDefNum",   { default = true, link = "Number" })
     set_hl(0, "MdictDef",      { default = true, bold = true, fg = "#73daca" })
-    set_hl(0, "MdictExample",  { default = true, italic = true, fg = "#565f89" })
+    -- Keep examples italic, but use a readable foreground instead of the
+    -- dark comment-like color that disappears in many floating-window themes.
+    set_hl(0, "MdictExample",  { default = true, italic = true, fg = "#c0caf5" })
     set_hl(0, "MdictBox",      { default = true, link = "WarningMsg" })
     set_hl(0, "MdictPhrasal",  { default = true, link = "Special" })
     set_hl(0, "MdictSynonym",  { default = true, link = "Constant" })
@@ -216,8 +218,8 @@ local function open_float(title)
         end
     end, { buffer = float_buf, nowait = true })
 
-    -- L: look up word under cursor, push current to history
-    vim.keymap.set("n", "L", function()
+    -- <leader>l: look up word under cursor, push current to history
+    vim.keymap.set("n", "<leader>l", function()
         local cword = vim.fn.expand("<cword>")
         if cword ~= "" then
             table.insert(history, { word = title, sections = deep_copy_sections(sections) })
@@ -331,6 +333,42 @@ function M.lookup(word)
     end
 
     open_float(word)
+end
+
+-- Look up the text selected in visual mode.  Keep this separate from lookup()
+-- so normal-mode callers continue to use <cword> by default.
+function M.lookup_visual()
+    -- The visual marks may not be updated until visual mode is left.  Read
+    -- the active anchor and cursor instead, so this also works from a visual
+    -- mode mapping.
+    local start = vim.fn.getpos("v")
+    local finish = vim.fn.getpos(".")
+
+    if start[2] == 0 or finish[2] == 0 then
+        vim.notify("No visual selection", vim.log.levels.WARN)
+        return
+    end
+
+    -- getpos() columns are one-based and the end position is inclusive;
+    -- nvim_buf_get_text() uses zero-based, end-exclusive columns.
+    local start_row = start[2] - 1
+    local end_row = finish[2] - 1
+    local start_col = start[3] - 1
+    local end_col = finish[3]
+
+    if start_row > end_row or (start_row == end_row and start_col > end_col - 1) then
+        start_row, end_row = end_row, start_row
+        start_col, end_col = end_col - 1, start_col + 1
+    end
+
+    local lines = vim.api.nvim_buf_get_text(0, start_row, start_col, end_row, end_col, {})
+    local word = vim.trim(table.concat(lines, " "))
+    if word == "" then
+        vim.notify("Visual selection is empty", vim.log.levels.WARN)
+        return
+    end
+
+    M.lookup(word)
 end
 
 function M.setup(opts)

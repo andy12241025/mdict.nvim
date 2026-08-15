@@ -17,6 +17,7 @@ Falls back to an online dictionary API when offline lookups fail.
 - **Navigate definitions** -- press `L` on any word in the result to look it up
 - **History** -- press `Esc` to go back to the previous lookup
 - **Collapsible sections** -- press `J` to toggle a dictionary's results
+- **Visual lookup** -- look up a selected phrase as well as the word under the cursor
 
 ## Requirements
 
@@ -41,7 +42,9 @@ pip install mdict-mquery
             -- or multiple:
             -- mdx_path = { "/path/to/dict1.mdx", "/path/to/dict2.mdx" },
         })
-        vim.keymap.set("n", "L", function() require("mdict").lookup() end, { desc = "Dictionary lookup" })
+        vim.keymap.set("n", "<leader>l", function() require("mdict").lookup() end, { desc = "Dictionary lookup" })
+        vim.keymap.set("x", "<leader>l", function() require("mdict").lookup_visual() end,
+            { desc = "Dictionary lookup selection" })
     end,
 },
 ```
@@ -63,13 +66,21 @@ In normal mode (configurable):
 
 | Key | Action |
 |-----|--------|
-| `L` | Look up word under cursor |
+| `<leader>l` | Look up word under cursor |
+
+In visual mode, map a key to `require("mdict").lookup_visual()` to look up the
+selected text:
+
+```lua
+vim.keymap.set("x", "<leader>l", function() require("mdict").lookup_visual() end,
+    { desc = "Dictionary lookup selection" })
+```
 
 Inside the floating window:
 
 | Key | Action |
 |-----|--------|
-| `L` | Look up word under cursor (drill into definitions) |
+| `<leader>l` | Look up word under cursor (drill into definitions) |
 | `Esc` | Go back to previous lookup, or close if no history |
 | `q` | Close the window |
 | `J` | Toggle collapse/expand of current dictionary section |
@@ -78,7 +89,7 @@ Inside the floating window:
 
 ## How It Works
 
-1. Pressing `L` grabs the word under the cursor
+1. Pressing `<leader>l` grabs the word under the cursor, or the selected text in visual mode
 2. Each configured `.mdx` file is queried via a Python helper using `mdict-mquery`
 3. If no offline dictionary has the word, inflected forms are tried (e.g. "plugins" -> "plugin")
 4. If still not found, the [Free Dictionary API](https://dictionaryapi.dev) is queried as a last resort
